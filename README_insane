@@ -1,0 +1,74 @@
+#!/bin/bash
+num_protein=2
+
+# #Translate proteins into new position. Afterwards, merge them using PyMOL
+gmx editconf -f SGGG.pdb -o prot1.pdb -translate 0 0 5.0 -noc
+gmx editconf -f SGGG.pdb -o prot2.pdb -translate 7.0 0 5.0 -noc
+
+# # Strip any existing END records and concatenate
+grep -v -E '^(END|TER)' prot1.pdb | \
+  sed '/^ATOM / s/^\(.\{21\}\)./\1A/; /^HETATM/ s/^\(.\{21\}\)./\1A/' > merged.pdb
+grep -v -E '^(END|TER)' prot2.pdb | \
+   sed '/^ATOM / s/^\(.\{21\}\)./\1B/; /^HETATM/ s/^\(.\{21\}\)./\1B/' >> merged.pdb
+
+#echo "END" >> merged.pdb
+
+martinize2 -f merged.pdb \
+	-x protein_cg.pdb \
+	-o system.top \
+	-ff martini3001 \
+	-elastic \
+	-maxwarn 4
+
+ ~/.local/bin/insane \
+  -f protein_cg.pdb \
+  -o system.gro \
+  -x 10 -y 10 -z 20 \
+  -l POPC:100 \
+  -sol W \
+  -salt 0.15 \
+  -p system.top
+
+
+last_hash_line_number=$(grep -n '^#' "system.top" | tail -n 1 | cut -d: -f1)
+
+
+sed -i '' 's|martini\.itp|../itp/martini_v3.0.0.itp|g' system.top
+sed -i '' 's|Protein|molecule_0|g' system.top
+sed -i '' '/^#include "molecule_0\.itp"/a
+
+#include "../itp/martini_v3.0.0_ions_v1.itp"\
+' system.top
+sed -i '' '/^#include "molecule_0\.itp"/a\
+#include "../itp/martini_v3.0.0_solvents_v1.itp"
+' system.top
+sed -i '' '/^#include "molecule_0\.itp"/a\
+#include "../itp/martini_v3.0.0_phospholipids_v1.itp"
+' system.top
+sed -i '' 's|NA+|NA|g' system.top
+sed -i '' 's|CL-|CL|g' system.top
+sed -i '' 's|NA+|NA|g' system.gro
+sed -i '' 's|CL-|CL|g' system.gro
+sed -E -i '' "s/^(molecule_0[[:space:]]+)[0-9]+/\\12/" system.top
+
+
+echo 'q' | gmx make_ndx -f system.gro
+python ../scripts/create_index.py system.gro
+
+gmx grompp -f ../mdp/em.mdp -c system.gro -p system.top -n index.ndx -o em.tpr -maxwarn 2
+gmx mdrun -deffnm em -v
+
+echo 'q' | gmx make_ndx -f em.gro
+python ../scripts/create_index.py em.gro
+
+gmx grompp -f ../mdp/eq.mdp -c em.gro -p system.top -n index.ndx -o eq.tpr -maxwarn 2
+gmx mdrun -v -deffnm eq
+
+gmx grompp -f ../mdp/md.mdp -p system.top -c eq.gro -n index.ndx -o md.tpr
+gmx mdrun -v -deffnm md -cpi
+
+echo 'Bilayer_Protein' | gmx trjconv -f md.xtc -s md.tpr -pbc whole -o md_pbc.xtc -n index.ndx
+echo 'Bilayer_Protein' | gmx trjconv -f md.gro -s md.tpr -pbc whole -o md_pbc.gro -n index.ndx
+echo 'Bilayer_Protein' | gmx convert-tpr -s md.tpr -n index.ndx -o md_pbc.tpr
+echo 'Protein' 'non-Protein' | gmx mindist -s md_pbc.tpr -f md_pbc.xtc -on contacts_amp-bilayer.xvg -group
+
