@@ -11,7 +11,7 @@ This repository contains the documentation for the project Engineering Immunothe
 We developed a computational pipeline, <ins>POR</ins>e-forming proteins <ins>C</ins>ompUtational <ins>P</ins>rediction pipl<ins>INE</ins> (PORCUPINE), combining transcriptomics, AlphaFold3 protein structure prediction, and coarse-grained molecular dynamics simulations. 
 <img width="711" height="107" alt="Screenshot 2026-10-01 at 3 09 23 PM" src="https://github.com/user-attachments/assets/bd684704-f186-4f03-bf14-daa1b752d5f3" />
 ### Transcriptomic Analysis 
-We used [R code file](Jafarah-et-al-analysis/Psuedobulk%20and%20DEG.R) to re-analyze data deposited in GEO.
+We used [R code file](Psuedobulk%20and%20DEG.R) to re-analyze data deposited in GEO.\
 <img width="570" height="355" alt="Screenshot 2026-10-01 at 3 17 50 PM" src="https://github.com/user-attachments/assets/4c2fdbab-9a9d-4980-96e4-c4cd8a11c0f9" />
 
 ### Molecular Dynamics Simulation
